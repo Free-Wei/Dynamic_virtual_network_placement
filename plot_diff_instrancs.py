@@ -118,8 +118,8 @@ def plot_instances(res_total_acc1_N10M3, res_total_acc1_N20M5,
     ax.set_xlim([0,T])
     ax.grid()
     plt.savefig(name, format="pdf", bbox_inches="tight")
-plot_instance(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, "img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf")
-plot_instance(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, "img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf", 1)
+plot_instance(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
+plot_instance(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
         
 print('========================= file saved =========================')
 

@@ -141,8 +141,8 @@ def plot_algos(result_test_total, result_test_total_acc1, name, judge=0):
     ax.set_xlim([0,T])
     ax.grid()
     plt.savefig(name, format="pdf", bbox_inches="tight")
-plot_algos(result_test_total, result_test_total_acc1, "img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf")
-plot_algos(con_test_total, con_test_total_acc1, "img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf", 1)
+plot_algos(result_test_total, result_test_total_acc1, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
+plot_algos(con_test_total, con_test_total_acc1, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
         
 print('========================= file saved =========================')
 

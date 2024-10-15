@@ -57,7 +57,7 @@ class VNE:
         self.lam_hat = np.zeros(self.M)
         
         self.update_times = np.unique([self.N*self.M+np.round(np.power( self.rho,k)) for k in np.arange(np.ceil(np.log(self.T)/np.log(self.rho)))])
-        #print(self.update_times)
+        
         self.kl_capacity = np.zeros_like(self.capacity)
         
         self.kl_total_power = np.zeros((self.M, self.N))
