@@ -11,12 +11,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from src.effVFP import VNE
-from src.plot_diff_algo import *
-from src.plot_diff_instances import *
+from plot_diff_algo import *
+from plot_diff_instances import *
 
-from warnings import warn
-if __name__ == '__main__':
-  warn('Warning !', DeprecationWarning)
+import warnings
+warnings.filterwarnings("ignore")
+
+
+
 
 print('========================= running 1 =========================')
 # ============= 
@@ -25,16 +27,8 @@ print('========================= running 1 =========================')
 M = 3
 N = 10
 k = 2
-
-T = N*M*1000
-np.random.seed(30)
-total_power = np.random.uniform(0.5,1,M*N).reshape(M,N)
-capacity = np.random.uniform(0,1,M*k*N).reshape(M,N,k)
-lam = np.random.uniform(0.5,1,M)
-lam = lam/np.sum(lam)
-
-beta = np.ones((N,k))*0.1
-test_times = 1
+T = N*M*10
+test_times = 50
     
 # running
 folder_path = "dataOUTPUT"
@@ -61,7 +55,7 @@ res_total_acc1_N100M10, _, con_test_total_N100M10,_ = simulINS(T,10,100,k,test_t
 
 
 # +++++++++++++++++++ Plot +++++++++++++++++++
-plot_instance(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
-plot_instance(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
+plot_instances(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
+plot_instances(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
         
 print(f'========================= Data saved to file {folder_path} and image saved to file img =========================')

@@ -48,21 +48,21 @@ class VNE:
 
         self.beta = beta
 
-        self.pulls = np.zeros((self.M, self.N),  dtype=np.int32)
+        self.n_ij = np.zeros((self.M, self.N),  dtype=np.int32)
         
-        self.c_cumu = np.zeros((self.M, self.N))
+        self.C_ij = np.zeros((self.M, self.N))
         
-        self.a_cumu = np.zeros_like(self.a)
+        self.A_ijk = np.zeros_like(self.a)
         
-        self.a_con_cumu= np.zeros_like(self.a)
+        self.k_ijk= np.zeros_like(self.a)
                 
-        self.lam_cumu = np.zeros(self.N)
+        self.lam_j = np.zeros(self.N)
         
-        self.c_hat = np.zeros((self.M, self.N))
+        self.c_ij_hat = np.zeros((self.M, self.N))
         
-        self.a_hat = np.zeros_like(self.a)
+        self.a_ijk_hat = np.zeros_like(self.a)
         
-        self.lam_hat = np.zeros(self.M)
+        self.lam_j_hat = np.zeros(self.M)
         
         self.update_times = np.unique([self.N*self.M+np.round(np.power( self.rho,k)) for k in np.arange(np.ceil(np.log(self.T)/np.log(self.rho)))])
         
@@ -70,13 +70,14 @@ class VNE:
         
         self.kl_c = np.zeros((self.M, self.N))
         
-        self.kl_lam_up = np.zeros(self.M)
-        
-        self.kl_lam_dn = np.zeros(self.M)
+        self.kl_lam = np.zeros(self.M)
         
         self.beta_new = np.tile(self.beta,self.M).reshape((self.N,np.shape(a)[-1],self.M))
-    #Compute KL divergence
+
     def KL(self, p, q):
+	"""
+    	Compute KL divergence between Bernoulli distributions of parameters p and q
+	"""
         if p == 0:
             return math.log(1 / (1 - q))
         if p == 1:
@@ -85,12 +86,19 @@ class VNE:
             return math.log(1 / q)
         return p * math.log(p / q) + (1 - p) * math.log((1 - p) / (1 - q))
     
-    # First derivative of KL divergence w.r.t q
     def kl_prime(self, p, q):
+    	"""
+    	Compute the first derivative of KL divergence w.r.t q
+	"""
         return -p / q + (1 - p) / (1 - q)
     
-    # KL-Upper Confidence Bound
     def getUCBKL(self, estimated, sample_times,lb,ub,tol = 1e-7):
+    	"""
+    	 KL-Upper Confidence Bound
+    	 lb, ub: lower bound and upper bound, for instance, 0 and 1
+    	 tol: Tolerance
+    	 
+	"""
         if sample_times == 0:
             kl = ub
         else:
@@ -108,8 +116,14 @@ class VNE:
                     q -= (compute_kl-bound)/compute_kl_prime
                 kl = q
         return kl
-    # KL-Lower Confidence Bound    
+        
     def getLCBKL(self, estimated, sample_times,lb,ub ,tol = 1e-7):
+    	"""
+    	 KL-Lower Confidence Bound
+    	 lb, ub: lower bound and upper bound, for instance, 0 and 1
+    	 tol: Tolerance
+    	 
+	"""
         if sample_times == 0:
             kl = lb
         else:
@@ -128,16 +142,24 @@ class VNE:
                 kl = q
         return kl
     
-    def compute_power(self, stra, opt_stra): 
+    def compute_power(self, stra, opt_stra):
+    	"""
+    	 Relative Gap
+    	 stra, opt_stra: Current strategy and optimal static strategy
+	""" 
         return np.sum(np.ravel(self.c.T*np.tile(self.lam,self.N).reshape((self.N, self.M))) * np.ravel((stra-opt_stra).T)) / np.sum(np.ravel(self.c.T*np.tile(self.lam,self.N).reshape((self.N, self.M))) * np.ravel(opt_stra.T))
 
 
     
     def compute_utilization(self, arms_t):
+	"""
+    	Compute the maximum expected utilization of k types resources on nodes "arms_t" 
+    	arms_t: current allocations obtained from current strategy 
+	""" 
         utilization = np.zeros((self.N, np.shape(self.a)[-1]))
         for arms in arms_t:
             for k in range(np.shape(self.a)[-1]):
-                utilization[arms, k] = np.sum(self.a_con_cumu[:, arms, k])/(self.beta[arms, k]*self.t)
+                utilization[arms, k] = np.sum(self.k_ijk[:, arms, k])/(self.beta[arms, k]*self.t)
         return np.max(utilization)
     
     def enter(self):
@@ -147,78 +169,63 @@ class VNE:
         return lam.astype(int)
     
     def draw(self, arms, lam):
-        c = np.zeros((self.M, self.N))
-        a = np.zeros_like(self.a)
+        C = np.zeros((self.M, self.N))
+        A = np.zeros_like(self.a)
         for player in range(self.M):
             if lam[player] != 0:
-                c[player][arms[player]] = np.random.binomial(1,self.c[player][arms[player]])
-                for a in range(self.N):
+                C[player][arms[player]] = np.random.binomial(1,self.c[player][arms[player]])
+                for n in range(self.N):
                     for k in range(np.shape(self.a)[-1]):
-                        a[player,a,k] = np.random.binomial(1,self.a[player,a,k])
-        return c, a
+                        A[player,n,k] = np.random.binomial(1,self.a[player,n,k])
+        return C, A
 
-    def lp(self, c, a, lam_dn):
-        obj_mul = np.ravel(c.T*np.tile(lam_dn,self.N).reshape((self.N, self.M)))
-        a = np.transpose(a, (1, 2, 0))/self.beta_new
-        A_ub = np.zeros((self.N*np.shape(a)[-1],len(obj_mul)))
+    def lp(self, C, A, lam_dn):
+    	"""
+    	 Solving linear program problem with estimated paramaters
+	""" 
+        obj_mul = np.ravel(C.T*np.tile(lam_dn,self.N).reshape((self.N, self.M)))
+        temp = np.transpose(A, (1, 2, 0))/self.beta_new
+        A_ub = np.zeros((self.N*np.shape(A)[-1],len(obj_mul)))
         count = 0
         j = 0
         for i in range(self.N):
-            for m in range(np.shape(a)[-1]):
+            for m in range(np.shape(A)[-1]):
                 for k in range(self.M):
-                    A_ub[j,count+k] = a[i,m,k]
+                    A_ub[j,count+k] = temp[i,m,k]
                 j += 1
             count += self.M
-        B_ub = np.ones(self.N*np.shape(a)[-1])
+        B_ub = np.ones(self.N*np.shape(A)[-1])
         A_eq = np.tile(np.eye(self.M),self.N)
         B_eq = np.ones(self.M)
         LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T)
         return LP_solution.x, LP_solution.fun
     
-    def lp_acc3(self, stra_init, c, a, lam_dn):
-        obj_mul = np.ravel(c.T*np.tile(lam_dn,self.N).reshape((self.N, self.M)))
-        a = np.transpose(a, (1, 2, 0))/self.beta_new
-        A_ub = np.zeros((self.N*np.shape(a)[-1],len(obj_mul)))
-        count = 0
-        j = 0
-        for i in range(self.N):
-            for m in range(np.shape(a)[-1]):
-                for k in range(self.M):
-                    A_ub[j,count+k] = a[i,m,k]
-                j += 1
-            count += self.M
-        B_ub = np.ones(self.N*np.shape(a)[-1])
-        A_eq = np.tile(np.eye(self.M),self.N)
-        B_eq = np.ones(self.M)
-        LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T, x0 = stra_init)
-        return LP_solution.x, LP_solution.fun
-    
     def lp_opt(self):
+    	"""
+    	 Solving linear program problem with static paramaters
+	""" 
         obj_mul = np.ravel(self.c.T*np.tile(self.lam,self.N).reshape((self.N, self.M)))
-        a = np.transpose(self.a, (1, 2, 0))/self.beta_new*np.tile(np.tile(self.lam,self.N).reshape((self.N, self.M)),np.shape(self.a)[-1]).reshape(self.N,np.shape(self.a)[-1],self.M)
+        temp = np.transpose(self.a, (1, 2, 0))/self.beta_new*np.tile(np.tile(self.lam,self.N).reshape((self.N, self.M)),np.shape(self.a)[-1]).reshape(self.N,np.shape(self.a)[-1],self.M)
         A_ub = np.zeros((self.N*np.shape(self.a)[-1],len(obj_mul)))
         count = 0
         j = 0
         for i in range(self.N):
             for m in range(np.shape(self.a)[-1]):
                 for k in range(self.M):
-                    A_ub[j,count+k] = a[i,m,k]
+                    A_ub[j,count+k] = temp[i,m,k]
                 j += 1
             count += self.M
         B_ub = np.ones(self.N*np.shape(self.a)[-1])
         A_eq = np.tile(np.eye(self.M),self.N)
         B_eq = np.ones(self.M)
         LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T)
-        #LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T,options={'tol': 1e-12})
         opt_allo = LP_solution.x.reshape(self.N,self.M)
         strategy = np.zeros((self.M,self.N))
         nor_opt = np.zeros((self.M,self.N))
         for player in range(self.M):
             strategy[player,:] = opt_allo[:,player]
             nor_opt[player,:] = strategy[player,:]/np.sum(strategy[player,:])
-        #print("strategy", strategy)
         opt = np.sum(np.ravel(self.c.T*np.tile(self.lam,self.N).reshape((self.N, self.M))) * np.ravel(nor_opt.T))
-        print("opt", opt)
         return LP_solution.x, opt
     
     def allocation(self, allo):
@@ -226,6 +233,7 @@ class VNE:
         allocation = allo.reshape(self.N,self.M)
         strategy = np.zeros((self.M,self.N))
         nor_strategy = np.zeros((self.M,self.N))
+        ###Normalization###
         for player in range(self.M):
             strategy[player,:] = allocation[:,player]
             nor_strategy[player,:] = strategy[player,:]/np.sum(strategy[player,:])
@@ -239,37 +247,40 @@ class VNE:
         nor_strategy = np.zeros((self.M,self.N))
         for player in range(self.M):
             strategy[player,:] = allocation[:,player]
+            ###Forced exploration###
             for a in range(self.N):
                 if strategy[player,a] < 0.001:
                     strategy[player,a]  = 0.01 -(self.t/self.T)*0.01
             nor_strategy[player,:] = strategy[player,:]/np.sum(strategy[player,:])
-            #print(nor_strategy)
             arm_chosen[player] = np.random.choice(self.N, 1, p = nor_strategy[player,:])
-        #print(nor_strategy)
         return arm_chosen, np.ravel(nor_strategy.T)
     
     def choose_arm(self):
+    	"""
+    	 Updated every time slot - Base Algo
+	""" 
         for player in range(self.M):
-            #self.kl_lam_up[player] = self.getUCBKL(self.lam_hat[player],self.t,0,1)
-            self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
+            self.kl_lam[player] = self.getLCBKL(self.lam_j_hat[player],self.t,0,1)
             for arm in range(self.N):
-                self.kl_c[player, arm] = self.getLCBKL(self.c_hat[player, arm],self.pulls[player, arm],0,1)
+                self.kl_c[player, arm] = self.getLCBKL(self.c_ij_hat[player, arm],self.n_ij[player, arm],0,1)
                 for G in range(np.shape(self.a)[-1]):
-                    self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G],self.t,0,1)
-        allo, _ = self.lp( self.kl_c, self.kl_a, self.kl_lam_dn )
+                    self.kl_a[player, arm,G] = self.getUCBKL(self.a_ijk_hat[player, arm, G],self.t,0,1)
+        allo, _ = self.lp( self.kl_c, self.kl_a, self.kl_lam )
         arm_chosen, strategy = self.allocation(allo)
         return arm_chosen.astype(int), strategy
     
     def choose_arm_acc1(self, stra_init):
+    	"""
+    	 Updated on exact time slot - Fast Algo
+	""" 
         if self.t in self.update_times:
             for player in range(self.M):
-                #self.kl_lam_up[player] = self.getUCBKL(self.lam_hat[player],self.t,0,1)
-                self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
+                self.kl_lam[player] = self.getLCBKL(self.lam_j_hat[player],self.t,0,1)
                 for arm in range(self.N):
-                    self.kl_c[player, arm] = self.getLCBKL(self.c_hat[player, arm],self.pulls[player, arm],0,1)
+                    self.kl_c[player, arm] = self.getLCBKL(self.c_ij_hat[player, arm],self.n_ij[player, arm],0,1)
                     for G in range(np.shape(self.a)[-1]):
-                        self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G], self.t,0,1)
-            allo, _ = self.lp(self.kl_c, self.kl_a, self.kl_lam_dn)
+                        self.kl_a[player, arm,G] = self.getUCBKL(self.a_ijk_hat[player, arm, G], self.t,0,1)
+            allo, _ = self.lp(self.kl_c, self.kl_a, self.kl_lam)
             arm_chosen, strategy = self.allocation(allo)
             return arm_chosen.astype(int), strategy
         elif (self.t-1 in self.update_times):
@@ -278,31 +289,6 @@ class VNE:
         else:
             arm_chosen, strategy = self.allocation(stra_init)
             return arm_chosen.astype(int), strategy            
-        
-    def choose_arm_acc2(self, arms_t, c = 0):
-        for player in range(self.M):
-                #self.kl_lam_up[player] = self.getUCBKL(self.lam_hat[player],self.t,0,1)
-                self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
-                for arm in range(self.N):
-                    if arm == arms_t[player]:
-                        self.kl_c[player, arm] = self.getLCBKL(self.c_hat[player, arm],self.pulls[player, arm],0,1)
-                        for G in range(np.shape(self.a)[-1]):
-                            self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G], self.t,0,1)
-        allo, _ = self.lp( self.kl_c, self.kl_a,self.kl_lam_dn )
-        arm_chosen, strategy = self.allocation(allo)
-        return arm_chosen.astype(int), strategy
-    
-    def choose_arm_acc3(self, stra_init):
-        for player in range(self.M):
-                #self.kl_lam_up[player] = self.getUCBKL(self.lam_hat[player],self.t,0,1)
-                self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
-                for arm in range(self.N):
-                    self.kl_c[player, arm] = self.getLCBKL(self.c_hat[player, arm], self.pulls[player, arm],0,1)
-                    for G in range(np.shape(self.a)[-1]):
-                        self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G], self.t,0,1)
-        allo, _ = self.lp_acc3( stra_init, self.kl_c, self.kl_a, self.kl_lam_dn )
-        arm_chosen, strategy = self.allocation(allo)
-        return arm_chosen.astype(int), strategy
     
             
     def run(self):
@@ -312,16 +298,16 @@ class VNE:
         while self.t < self.T: # explore
             self.t +=1
             lam_t = self.enter()
-            self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
-            self.lam_hat= self.lam_cumu / (self.t)
+            self.lam_j[np.arange(self.M)] += lam_t[np.arange(self.M)]
+            self.lam_j_hat= self.lam_j / (self.t)
             arms_t, strategy = self.choose_arm()
-            c_t, a_t = self.draw(arms_t,lam_t)
-            self.pulls[np.arange(self.M), arms_t] += lam_t
-            self.c_cumu[np.arange(self.M), arms_t] += c_t[np.arange(self.M), arms_t]
-            self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
-            self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
-            self.c_hat = np.divide(self.c_cumu, self.pulls,  out=np.zeros_like(self.c_cumu), where=self.pulls != 0)
-            self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
+            C_t, A_t = self.draw(arms_t,lam_t)
+            self.n_ij[np.arange(self.M), arms_t] += lam_t
+            self.C_ij[np.arange(self.M), arms_t] += C_t[np.arange(self.M), arms_t]
+            self.k_ijk[np.arange(self.M), arms_t,:] += A_t[np.arange(self.M), arms_t,:]
+            self.A_ijk[np.arange(self.M), :,:] += A_t[np.arange(self.M), :,:]
+            self.c_ij_hat = np.divide(self.C_ij, self.n_ij,  out=np.zeros_like(self.C_ij), where=self.n_ij != 0)
+            self.a_ijk_hat = np.divide(self.A_ijk, self.t, out=np.zeros_like(self.A_ijk), where=self.t != 0)
             cons = self.compute_utilization(arms_t)
             cons_total.append(cons)
             result = self.compute_power(strategy.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
@@ -339,16 +325,16 @@ class VNE:
             if self.t <= self.N*self.M:
                 self.t += 1
                 lam_t = self.enter()
-                self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
-                self.lam_hat= self.lam_cumu / (self.t)
+                self.lam_j[np.arange(self.M)] += lam_t[np.arange(self.M)]
+                self.lam_j_hat= self.lam_j / (self.t)
                 arms_t = np.random.choice(self.N, self.M)
-                c_t, a_t = self.draw(arms_t,lam_t)
-                self.pulls[np.arange(self.M), arms_t] += lam_t
-                self.c_cumu[np.arange(self.M), arms_t] += c_t[np.arange(self.M), arms_t]
-                self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
-                self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
-                self.c_hat = np.divide(self.c_cumu, self.pulls,  out=np.zeros_like(self.c_cumu), where=self.pulls != 0)
-                self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
+                C_t, A_t = self.draw(arms_t,lam_t)
+                self.n_ij[np.arange(self.M), arms_t] += lam_t
+                self.C_ij[np.arange(self.M), arms_t] += C_t[np.arange(self.M), arms_t]
+                self.k_ijk[np.arange(self.M), arms_t,:] += A_t[np.arange(self.M), arms_t,:]
+                self.A_ijk[np.arange(self.M), :,:] += A_t[np.arange(self.M), :,:]
+                self.c_ij_hat = np.divide(self.C_ij, self.n_ij,  out=np.zeros_like(self.C_ij), where=self.n_ij != 0)
+                self.a_ijk_hat = np.divide(self.A_ijk, self.t, out=np.zeros_like(self.A_ijk), where=self.t != 0)
                 cons = self.compute_utilization(arms_t)
                 cons_total.append(cons)
                 result = self.compute_power(stra_init.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
@@ -356,74 +342,22 @@ class VNE:
             else:
                 self.t +=1
                 lam_t = self.enter()
-                self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
-                self.lam_hat= self.lam_cumu / (self.t)
+                self.lam_j[np.arange(self.M)] += lam_t[np.arange(self.M)]
+                self.lam_j_hat= self.lam_j / (self.t)
                 arms_t, stra_init = self.choose_arm_acc1(stra_init)
-                c_t, a_t = self.draw(arms_t,lam_t)
-                self.pulls[np.arange(self.M), arms_t] += lam_t
-                self.c_cumu[np.arange(self.M), arms_t] += c_t[np.arange(self.M), arms_t]
-                self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
-                self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
-                self.c_hat = np.divide(self.c_cumu, self.pulls,  out=np.zeros_like(self.c_cumu), where=self.pulls != 0)
-                self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
+                C_t, A_t = self.draw(arms_t,lam_t)
+                self.n_ij[np.arange(self.M), arms_t] += lam_t
+                self.C_ij[np.arange(self.M), arms_t] += C_t[np.arange(self.M), arms_t]
+                self.k_ijk[np.arange(self.M), arms_t,:] += A_t[np.arange(self.M), arms_t,:]
+                self.A_ijk[np.arange(self.M), :,:] += A_t[np.arange(self.M), :,:]
+                self.c_ij_hat = np.divide(self.C_ij, self.n_ij,  out=np.zeros_like(self.C_ij), where=self.n_ij != 0)
+                self.a_ijk_hat = np.divide(self.A_ijk, self.t, out=np.zeros_like(self.A_ijk), where=self.t != 0)
                 cons = self.compute_utilization(arms_t)
                 cons_total.append(cons)
                 result = self.compute_power(stra_init.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
                 result_total.append(result)
         return result_total, opt_result, cons_total
     
-    def run_acc2(self):
-        result_total = []
-        cons_total = []
-        opt_strategy, opt_result = self.lp_opt()
-        arms_t = np.zeros(self.M)
-        while self.t < self.T: # explore
-            self.t +=1
-            lam_t = self.enter()
-            self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
-            self.lam_hat= self.lam_cumu / (self.t)
-            arms_t, strategy = self.choose_arm_acc2(arms_t)
-            c_t, a_t = self.draw(arms_t,lam_t)
-            self.pulls[np.arange(self.M), arms_t] += lam_t
-            self.c_cumu[np.arange(self.M), arms_t] += c_t[np.arange(self.M), arms_t]
-            self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
-            self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
-            self.c_hat = np.divide(self.c_cumu, self.pulls,  out=np.zeros_like(self.c_cumu), where=self.pulls != 0)
-            self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
-            cons = self.compute_utilization(arms_t)
-            cons_total.append(cons)
-            result = self.compute_power(strategy.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
-            result_total.append(result)
-        return result_total, opt_result, cons_total
-    
-    def run_acc3(self):
-        result_total = []
-        cons_total = []
-        opt_strategy, opt_result = self.lp_opt()
-        identity_matrix = np.eye(self.N)
-        stra_init = np.tile(identity_matrix[0,:],self.M)
-        while self.t < self.T: # explore
-            self.t +=1
-            lam_t = self.enter()
-            self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
-            self.lam_hat= self.lam_cumu / (self.t)
-            arms_t, stra_init = self.choose_arm_acc3(stra_init)
-            c_t, a_t= self.draw(arms_t,lam_t)
-            self.pulls[np.arange(self.M), arms_t] += lam_t
-            self.c_cumu[np.arange(self.M), arms_t] += c_t[np.arange(self.M), arms_t]
-            self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
-            self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
-            self.c_hat = np.divide(self.c_cumu, self.pulls,  out=np.zeros_like(self.c_cumu), where=self.pulls != 0)
-            self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
-            cons = self.compute_utilization(arms_t)
-            cons_total.append(cons)
-            result = self.compute_power(stra_init.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
-            result_total.append(result)
-
-        return result_total, opt_result, cons_total
-            
-            
-#### N: Nodes(N)   M: Functions(M)  K: Resources(k)
 
 
 
