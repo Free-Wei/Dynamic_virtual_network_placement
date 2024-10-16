@@ -21,7 +21,7 @@ import scipy.optimize as optimize
 import pandas as pd
 
 class VNE:
-    def __init__(self, total_power, N, M, T, lam, capacity, beta):
+    def __init__(self, total_power, N, M, T, lam, a, beta):
         self.T = T
         
         self.M = M
@@ -32,7 +32,7 @@ class VNE:
         
         self.rho = 1.05
         
-        self.capacity = capacity
+        self.a = a
         
         self.total_power = total_power
         
@@ -44,21 +44,21 @@ class VNE:
         
         self.total_power_cumu = np.zeros((self.M, self.N))
         
-        self.capacity_cumu = np.zeros_like(self.capacity)
+        self.a_cumu = np.zeros_like(self.a)
         
-        self.capacity_con_cumu= np.zeros_like(self.capacity)
+        self.a_con_cumu= np.zeros_like(self.a)
                 
         self.lam_cumu = np.zeros(self.N)
         
         self.total_power_hat = np.zeros((self.M, self.N))
         
-        self.capacity_hat = np.zeros_like(self.capacity)
+        self.a_hat = np.zeros_like(self.a)
         
         self.lam_hat = np.zeros(self.M)
         
         self.update_times = np.unique([self.N*self.M+np.round(np.power( self.rho,k)) for k in np.arange(np.ceil(np.log(self.T)/np.log(self.rho)))])
         
-        self.kl_capacity = np.zeros_like(self.capacity)
+        self.kl_a = np.zeros_like(self.a)
         
         self.kl_total_power = np.zeros((self.M, self.N))
         
@@ -66,7 +66,7 @@ class VNE:
         
         self.kl_lam_dn = np.zeros(self.M)
         
-        self.beta_new = np.tile(self.beta,self.M).reshape((self.N,np.shape(capacity)[-1],self.M))
+        self.beta_new = np.tile(self.beta,self.M).reshape((self.N,np.shape(a)[-1],self.M))
     #Compute KL divergence
     def KL(self, p, q):
         if p == 0:
@@ -126,10 +126,10 @@ class VNE:
 
     
     def compute_utilization(self, arms_t):
-        utilization = np.zeros((self.N, np.shape(self.capacity)[-1]))
+        utilization = np.zeros((self.N, np.shape(self.a)[-1]))
         for arms in arms_t:
-            for k in range(np.shape(self.capacity)[-1]):
-                utilization[arms, k] = np.sum(self.capacity_con_cumu[:, arms, k])/(self.beta[arms, k]*self.t)
+            for k in range(np.shape(self.a)[-1]):
+                utilization[arms, k] = np.sum(self.a_con_cumu[:, arms, k])/(self.beta[arms, k]*self.t)
         return np.max(utilization)
     
     def enter(self):
@@ -140,46 +140,46 @@ class VNE:
     
     def draw(self, arms, lam):
         total_power = np.zeros((self.M, self.N))
-        capacity = np.zeros_like(self.capacity)
+        a = np.zeros_like(self.a)
         for player in range(self.M):
             if lam[player] != 0:
                 total_power[player][arms[player]] = np.random.binomial(1,self.total_power[player][arms[player]])
                 for a in range(self.N):
-                    for k in range(np.shape(self.capacity)[-1]):
-                        capacity[player,a,k] = np.random.binomial(1,self.capacity[player,a,k])
-        return total_power, capacity
+                    for k in range(np.shape(self.a)[-1]):
+                        a[player,a,k] = np.random.binomial(1,self.a[player,a,k])
+        return total_power, a
 
-    def lp(self, total_power, capacity, lam_dn):
+    def lp(self, total_power, a, lam_dn):
         obj_mul = np.ravel(total_power.T*np.tile(lam_dn,self.N).reshape((self.N, self.M)))
-        a = np.transpose(capacity, (1, 2, 0))/self.beta_new
-        A_ub = np.zeros((self.N*np.shape(capacity)[-1],len(obj_mul)))
+        a = np.transpose(a, (1, 2, 0))/self.beta_new
+        A_ub = np.zeros((self.N*np.shape(a)[-1],len(obj_mul)))
         count = 0
         j = 0
         for i in range(self.N):
-            for m in range(np.shape(capacity)[-1]):
+            for m in range(np.shape(a)[-1]):
                 for k in range(self.M):
                     A_ub[j,count+k] = a[i,m,k]
                 j += 1
             count += self.M
-        B_ub = np.ones(self.N*np.shape(capacity)[-1])
+        B_ub = np.ones(self.N*np.shape(a)[-1])
         A_eq = np.tile(np.eye(self.M),self.N)
         B_eq = np.ones(self.M)
         LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T)
         return LP_solution.x, LP_solution.fun
     
-    def lp_acc3(self, stra_init, total_power, capacity, lam_dn):
+    def lp_acc3(self, stra_init, total_power, a, lam_dn):
         obj_mul = np.ravel(total_power.T*np.tile(lam_dn,self.N).reshape((self.N, self.M)))
-        a = np.transpose(capacity, (1, 2, 0))/self.beta_new
-        A_ub = np.zeros((self.N*np.shape(capacity)[-1],len(obj_mul)))
+        a = np.transpose(a, (1, 2, 0))/self.beta_new
+        A_ub = np.zeros((self.N*np.shape(a)[-1],len(obj_mul)))
         count = 0
         j = 0
         for i in range(self.N):
-            for m in range(np.shape(capacity)[-1]):
+            for m in range(np.shape(a)[-1]):
                 for k in range(self.M):
                     A_ub[j,count+k] = a[i,m,k]
                 j += 1
             count += self.M
-        B_ub = np.ones(self.N*np.shape(capacity)[-1])
+        B_ub = np.ones(self.N*np.shape(a)[-1])
         A_eq = np.tile(np.eye(self.M),self.N)
         B_eq = np.ones(self.M)
         LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T, x0 = stra_init)
@@ -187,17 +187,17 @@ class VNE:
     
     def lp_opt(self):
         obj_mul = np.ravel(self.total_power.T*np.tile(self.lam,self.N).reshape((self.N, self.M)))
-        a = np.transpose(self.capacity, (1, 2, 0))/self.beta_new*np.tile(np.tile(self.lam,self.N).reshape((self.N, self.M)),np.shape(self.capacity)[-1]).reshape(self.N,np.shape(self.capacity)[-1],self.M)
-        A_ub = np.zeros((self.N*np.shape(self.capacity)[-1],len(obj_mul)))
+        a = np.transpose(self.a, (1, 2, 0))/self.beta_new*np.tile(np.tile(self.lam,self.N).reshape((self.N, self.M)),np.shape(self.a)[-1]).reshape(self.N,np.shape(self.a)[-1],self.M)
+        A_ub = np.zeros((self.N*np.shape(self.a)[-1],len(obj_mul)))
         count = 0
         j = 0
         for i in range(self.N):
-            for m in range(np.shape(self.capacity)[-1]):
+            for m in range(np.shape(self.a)[-1]):
                 for k in range(self.M):
                     A_ub[j,count+k] = a[i,m,k]
                 j += 1
             count += self.M
-        B_ub = np.ones(self.N*np.shape(self.capacity)[-1])
+        B_ub = np.ones(self.N*np.shape(self.a)[-1])
         A_eq = np.tile(np.eye(self.M),self.N)
         B_eq = np.ones(self.M)
         LP_solution = optimize.linprog( obj_mul.T, A_ub, B_ub.T, A_eq, B_eq.T)
@@ -246,9 +246,9 @@ class VNE:
             self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
             for arm in range(self.N):
                 self.kl_total_power[player, arm] = self.getLCBKL(self.total_power_hat[player, arm],self.pulls[player, arm],0,1)
-                for G in range(np.shape(self.capacity)[-1]):
-                    self.kl_capacity[player, arm,G] = self.getUCBKL(self.capacity_hat[player, arm, G],self.t,0,1)
-        allo, _ = self.lp( self.kl_total_power, self.kl_capacity, self.kl_lam_dn )
+                for G in range(np.shape(self.a)[-1]):
+                    self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G],self.t,0,1)
+        allo, _ = self.lp( self.kl_total_power, self.kl_a, self.kl_lam_dn )
         arm_chosen, strategy = self.allocation(allo)
         return arm_chosen.astype(int), strategy
     
@@ -259,9 +259,9 @@ class VNE:
                 self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
                 for arm in range(self.N):
                     self.kl_total_power[player, arm] = self.getLCBKL(self.total_power_hat[player, arm],self.pulls[player, arm],0,1)
-                    for G in range(np.shape(self.capacity)[-1]):
-                        self.kl_capacity[player, arm,G] = self.getUCBKL(self.capacity_hat[player, arm, G], self.t,0,1)
-            allo, _ = self.lp(self.kl_total_power, self.kl_capacity, self.kl_lam_dn)
+                    for G in range(np.shape(self.a)[-1]):
+                        self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G], self.t,0,1)
+            allo, _ = self.lp(self.kl_total_power, self.kl_a, self.kl_lam_dn)
             arm_chosen, strategy = self.allocation(allo)
             return arm_chosen.astype(int), strategy
         elif (self.t-1 in self.update_times):
@@ -278,9 +278,9 @@ class VNE:
                 for arm in range(self.N):
                     if arm == arms_t[player]:
                         self.kl_total_power[player, arm] = self.getLCBKL(self.total_power_hat[player, arm],self.pulls[player, arm],0,1)
-                        for G in range(np.shape(self.capacity)[-1]):
-                            self.kl_capacity[player, arm,G] = self.getUCBKL(self.capacity_hat[player, arm, G], self.t,0,1)
-        allo, _ = self.lp( self.kl_total_power, self.kl_capacity,self.kl_lam_dn )
+                        for G in range(np.shape(self.a)[-1]):
+                            self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G], self.t,0,1)
+        allo, _ = self.lp( self.kl_total_power, self.kl_a,self.kl_lam_dn )
         arm_chosen, strategy = self.allocation(allo)
         return arm_chosen.astype(int), strategy
     
@@ -290,9 +290,9 @@ class VNE:
                 self.kl_lam_dn[player] = self.getLCBKL(self.lam_hat[player],self.t,0,1)
                 for arm in range(self.N):
                     self.kl_total_power[player, arm] = self.getLCBKL(self.total_power_hat[player, arm], self.pulls[player, arm],0,1)
-                    for G in range(np.shape(self.capacity)[-1]):
-                        self.kl_capacity[player, arm,G] = self.getUCBKL(self.capacity_hat[player, arm, G], self.t,0,1)
-        allo, _ = self.lp_acc3( stra_init, self.kl_total_power, self.kl_capacity, self.kl_lam_dn )
+                    for G in range(np.shape(self.a)[-1]):
+                        self.kl_a[player, arm,G] = self.getUCBKL(self.a_hat[player, arm, G], self.t,0,1)
+        allo, _ = self.lp_acc3( stra_init, self.kl_total_power, self.kl_a, self.kl_lam_dn )
         arm_chosen, strategy = self.allocation(allo)
         return arm_chosen.astype(int), strategy
     
@@ -307,13 +307,13 @@ class VNE:
             self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
             self.lam_hat= self.lam_cumu / (self.t)
             arms_t, strategy = self.choose_arm()
-            total_power_t, capacity_t = self.draw(arms_t,lam_t)
+            total_power_t, a_t = self.draw(arms_t,lam_t)
             self.pulls[np.arange(self.M), arms_t] += lam_t
             self.total_power_cumu[np.arange(self.M), arms_t] += total_power_t[np.arange(self.M), arms_t]
-            self.capacity_con_cumu[np.arange(self.M), arms_t,:] += capacity_t[np.arange(self.M), arms_t,:]
-            self.capacity_cumu[np.arange(self.M), :,:] += capacity_t[np.arange(self.M), :,:]
+            self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
+            self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
             self.total_power_hat = np.divide(self.total_power_cumu, self.pulls,  out=np.zeros_like(self.total_power_cumu), where=self.pulls != 0)
-            self.capacity_hat = np.divide(self.capacity_cumu, self.t, out=np.zeros_like(self.capacity_cumu), where=self.t != 0)
+            self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
             cons = self.compute_utilization(arms_t)
             cons_total.append(cons)
             result = self.compute_power(strategy.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
@@ -334,13 +334,13 @@ class VNE:
                 self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
                 self.lam_hat= self.lam_cumu / (self.t)
                 arms_t = np.random.choice(self.N, self.M)
-                total_power_t, capacity_t = self.draw(arms_t,lam_t)
+                total_power_t, a_t = self.draw(arms_t,lam_t)
                 self.pulls[np.arange(self.M), arms_t] += lam_t
                 self.total_power_cumu[np.arange(self.M), arms_t] += total_power_t[np.arange(self.M), arms_t]
-                self.capacity_con_cumu[np.arange(self.M), arms_t,:] += capacity_t[np.arange(self.M), arms_t,:]
-                self.capacity_cumu[np.arange(self.M), :,:] += capacity_t[np.arange(self.M), :,:]
+                self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
+                self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
                 self.total_power_hat = np.divide(self.total_power_cumu, self.pulls,  out=np.zeros_like(self.total_power_cumu), where=self.pulls != 0)
-                self.capacity_hat = np.divide(self.capacity_cumu, self.t, out=np.zeros_like(self.capacity_cumu), where=self.t != 0)
+                self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
                 cons = self.compute_utilization(arms_t)
                 cons_total.append(cons)
                 result = self.compute_power(stra_init.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
@@ -351,13 +351,13 @@ class VNE:
                 self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
                 self.lam_hat= self.lam_cumu / (self.t)
                 arms_t, stra_init = self.choose_arm_acc1(stra_init)
-                total_power_t, capacity_t = self.draw(arms_t,lam_t)
+                total_power_t, a_t = self.draw(arms_t,lam_t)
                 self.pulls[np.arange(self.M), arms_t] += lam_t
                 self.total_power_cumu[np.arange(self.M), arms_t] += total_power_t[np.arange(self.M), arms_t]
-                self.capacity_con_cumu[np.arange(self.M), arms_t,:] += capacity_t[np.arange(self.M), arms_t,:]
-                self.capacity_cumu[np.arange(self.M), :,:] += capacity_t[np.arange(self.M), :,:]
+                self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
+                self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
                 self.total_power_hat = np.divide(self.total_power_cumu, self.pulls,  out=np.zeros_like(self.total_power_cumu), where=self.pulls != 0)
-                self.capacity_hat = np.divide(self.capacity_cumu, self.t, out=np.zeros_like(self.capacity_cumu), where=self.t != 0)
+                self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
                 cons = self.compute_utilization(arms_t)
                 cons_total.append(cons)
                 result = self.compute_power(stra_init.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
@@ -375,13 +375,13 @@ class VNE:
             self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
             self.lam_hat= self.lam_cumu / (self.t)
             arms_t, strategy = self.choose_arm_acc2(arms_t)
-            total_power_t, capacity_t = self.draw(arms_t,lam_t)
+            total_power_t, a_t = self.draw(arms_t,lam_t)
             self.pulls[np.arange(self.M), arms_t] += lam_t
             self.total_power_cumu[np.arange(self.M), arms_t] += total_power_t[np.arange(self.M), arms_t]
-            self.capacity_con_cumu[np.arange(self.M), arms_t,:] += capacity_t[np.arange(self.M), arms_t,:]
-            self.capacity_cumu[np.arange(self.M), :,:] += capacity_t[np.arange(self.M), :,:]
+            self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
+            self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
             self.total_power_hat = np.divide(self.total_power_cumu, self.pulls,  out=np.zeros_like(self.total_power_cumu), where=self.pulls != 0)
-            self.capacity_hat = np.divide(self.capacity_cumu, self.t, out=np.zeros_like(self.capacity_cumu), where=self.t != 0)
+            self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
             cons = self.compute_utilization(arms_t)
             cons_total.append(cons)
             result = self.compute_power(strategy.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
@@ -400,13 +400,13 @@ class VNE:
             self.lam_cumu[np.arange(self.M)] += lam_t[np.arange(self.M)]
             self.lam_hat= self.lam_cumu / (self.t)
             arms_t, stra_init = self.choose_arm_acc3(stra_init)
-            total_power_t, capacity_t= self.draw(arms_t,lam_t)
+            total_power_t, a_t= self.draw(arms_t,lam_t)
             self.pulls[np.arange(self.M), arms_t] += lam_t
             self.total_power_cumu[np.arange(self.M), arms_t] += total_power_t[np.arange(self.M), arms_t]
-            self.capacity_con_cumu[np.arange(self.M), arms_t,:] += capacity_t[np.arange(self.M), arms_t,:]
-            self.capacity_cumu[np.arange(self.M), :,:] += capacity_t[np.arange(self.M), :,:]
+            self.a_con_cumu[np.arange(self.M), arms_t,:] += a_t[np.arange(self.M), arms_t,:]
+            self.a_cumu[np.arange(self.M), :,:] += a_t[np.arange(self.M), :,:]
             self.total_power_hat = np.divide(self.total_power_cumu, self.pulls,  out=np.zeros_like(self.total_power_cumu), where=self.pulls != 0)
-            self.capacity_hat = np.divide(self.capacity_cumu, self.t, out=np.zeros_like(self.capacity_cumu), where=self.t != 0)
+            self.a_hat = np.divide(self.a_cumu, self.t, out=np.zeros_like(self.a_cumu), where=self.t != 0)
             cons = self.compute_utilization(arms_t)
             cons_total.append(cons)
             result = self.compute_power(stra_init.reshape(self.N,self.M).T,(opt_strategy.reshape(self.N,self.M).T))
