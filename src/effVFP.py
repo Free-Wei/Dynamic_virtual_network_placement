@@ -20,6 +20,11 @@ import itertools
 import scipy.optimize as optimize
 import pandas as pd
 
+from warnings import warn
+if __name__ == '__main__':
+  warn('Warning !', DeprecationWarning)
+
+
 class VNE:
     def __init__(self, c, N, M, T, lam, a, beta):
         """Class constructor ...

@@ -12,8 +12,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from effVFP import VNE
-import warnings
-warnings.filterwarnings('ignore')
+from warnings import warn
+if __name__ == '__main__':
+  warn('Warning !', DeprecationWarning)
 
 print('========================= running =========================')
 T = 500000

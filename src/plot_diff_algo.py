@@ -15,22 +15,6 @@ import warnings
 warnings.filterwarnings('ignore')
 
 print('========================= running =========================')
-# ============= 
-# Parameter 
-# ============= 
-M = 3
-N = 10
-k = 2
-
-T = N*M*1000
-np.random.seed(30)
-total_power = np.random.uniform(0.5,1,M*N).reshape(M,N)
-capacity = np.random.uniform(0,1,M*k*N).reshape(M,N,k)
-lam = np.random.uniform(0.5,1,M)
-lam = lam/np.sum(lam)
-
-beta = np.ones((N,k))*0.1
-test_times = 1
 
 def filtering(y,win):
     z = np.convolve(y,np.ones(win))/win
