@@ -22,10 +22,9 @@ import pandas as pd
 
 class VNE:
     def __init__(self, c, N, M, T, lam, a, beta):
-            """Class constructor ...
-            See paper
-            """
-
+        """Class constructor ...
+        See paper
+        """
         self.T = T
         
         self.M = M
