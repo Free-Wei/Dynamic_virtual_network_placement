@@ -47,7 +47,9 @@ def simulALGO(T,M,N,k,test_times, folder_path):
     running_time_acc1 = np.zeros(test_times)
     res_opt_acc1_total = np.zeros(test_times)
 
-    for m in range(test_times):
+    for m in tqdm (range (test_times), 
+               desc="Loading…", 
+               ascii=False, ncols=75):
 
         test = VNE(total_power, N, M, T, lam, capacity, beta)
 
@@ -70,7 +72,7 @@ def simulALGO(T,M,N,k,test_times, folder_path):
         res_opt_acc1_total[m] = res_opt_acc1
         result_test_total_acc1[:,m] = res_total_acc1
         con_test_total_acc1[:,m] = con_total_acc1
-
+     
     # +++++
     data_default = {
     'max_result': np.max(result_test_total, axis = 1),
@@ -125,24 +127,28 @@ def plot_algos(result_test_total, result_test_total_acc1, name, judge=0):
     ax.plot(x[r], y, lw=2, label='Base algorithm', color='blue')
     ax.fill_between(x[r], 
                     filtering(np.max(result_test_total, axis = 1), win), 
-                    filtering(np.min(result_test_total, axis = 1), win), facecolor='blue', alpha=0.3)
+                    filtering(np.min(result_test_total, axis = 1), win), facecolor='blue', alpha=0.2)
     ax.plot(x[r], y1, lw=2, label='Fast algorithm', color='red')
     ax.fill_between(x[r], 
                     filtering(np.max(result_test_total_acc1, axis = 1), win), 
-                    filtering(np.min(result_test_total_acc1, axis = 1), win), facecolor='red', alpha=0.3)
+                    filtering(np.min(result_test_total_acc1, axis = 1), win), facecolor='red', alpha=0.2)
     if judge == 1:
-        ax.plot(x, np.array(1).repeat(T), lw=2, label='Constraints Limits', color='black')
+        ax.plot(x, np.array(1).repeat(T),linestyle='dashed', lw=3, color='black')
+        plt.text(12500, 1.03, 'Threshold', fontsize = 20)
         ax.set_ylabel('Maximum Constraint Vaule')
+        ax.legend(fontsize = 25,loc='lower right')
     else:
         ax.set_ylabel('Relative Gap')
-    ax.legend(loc='upper right')
+        ax.legend(fontsize = 25,loc='upper right')
     ax.set_xlabel('Iterations')
-    
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+             ax.get_xticklabels() + ax.get_yticklabels()):
+    item.set_fontsize(20)
     ax.set_xlim([0,T])
     ax.grid()
     plt.savefig(name, format="pdf", bbox_inches="tight")
 plot_algos(result_test_total, result_test_total_acc1, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
 plot_algos(con_test_total, con_test_total_acc1, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
         
-print('========================= file saved =========================')
+print(f'========================= Data saved to file {folder_path} and image saved to file img =========================')
 
