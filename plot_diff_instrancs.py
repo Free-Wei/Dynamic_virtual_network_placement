@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 print('========================= running =========================')
-
+T = 500000
 def filtering(y,win):
     z = np.convolve(y,np.ones(win))/win
     return z[range(win,len(y))]
@@ -26,7 +26,9 @@ def simulINS(T,M,N,k,test_times,folder_path):
     con_test_total_acc1 = np.zeros((T, test_times))
     running_time_acc1 = np.zeros(test_times)
     res_opt_acc1_total = np.zeros(test_times)
-    for m in range(test_times):
+    for m in tqdm (range (test_times), 
+               desc="Loading…", 
+               ascii=False, ncols=75):
         total_power = np.random.uniform(0.5,1,M*N).reshape(M,N)
         capacity = np.random.uniform(0,1,M*k*N).reshape(M,N,k)
         lam = np.random.uniform(0.5,1,M)
@@ -78,42 +80,45 @@ res_total_acc1_N100M10, _, con_test_total_N100M10,_ = simulINS(T,10,100,k,test_t
 
 def plot_instances(res_total_acc1_N10M3, res_total_acc1_N20M5,
             res_total_acc1_N50M8, res_total_acc1_N100M10, judge):
-    win = 15000
+    win = 1000
+    sub_samples = 5000
     fig, ax = plt.subplots(figsize=(10, 6))
     x = np.arange(T)
-    r = range(win,T)
 
     y = filtering(res_total_acc1_N10M3.mean(axis = 1), win)
     y1 = filtering(res_total_acc1_N20M5.mean( axis = 1), win)
     y2 = filtering(res_total_acc1_N50M8.mean( axis = 1), win)
     y3 =filtering(res_total_acc1_N100M10.mean( axis = 1), win)
 
-    ax.plot(x[r], y, lw=2, label='K=10,M=3', color='blue')
-    ax.fill_between(x[r], 
-                    filtering(np.max(res_total_acc1_N10M3, axis = 1), win),
-                    filtering(np.min(res_total_acc1_N10M3, axis = 1), win), facecolor='blue', alpha=0.3)
+    ax.plot(x[win::sub_samples], y[::sub_samples], lw=2, label='N=10,M=3', color='blue')
+    ax.fill_between(x[win::sub_samples], 
+                    filtering(np.max(res_total_acc1_N10M3, axis = 1), win)[::sub_samples],
+                    filtering(np.min(res_total_acc1_N10M3, axis = 1), win)[::sub_samples], facecolor='blue', alpha=0.2)
     
-    ax.plot(x[r], y1, lw=2, label='K=20,M=5', color='red')
-    ax.fill_between(x[r], 
-                    filtering(np.max(res_total_acc1_N20M5, axis = 1), win),
-                    filtering(np.min(res_total_acc1_N20M5, axis = 1), win), facecolor='red', alpha=0.3)
+    ax.plot(x[win::sub_samples], y1[::sub_samples], lw=2, label='N=20,M=5', color='red')
+    ax.fill_between(x[win::sub_samples], 
+                    filtering(np.max(res_total_acc1_N20M5, axis = 1), win)[::sub_samples],
+                    filtering(np.min(res_total_acc1_N20M5, axis = 1), win)[::sub_samples], facecolor='red', alpha=0.2)
     
-    ax.plot(x[r], y2, lw=2, label='K=50,M=8', color='green')
-    ax.fill_between(x[r],
-                    filtering(np.max(res_total_acc1_N50M8, axis = 1), win),
-                    filtering(np.max(res_total_acc1_N50M8, axis = 1), win), facecolor='green', alpha=0.3)
+    ax.plot(x[win::sub_samples], y2[::sub_samples], lw=2, label='N=50,M=8', color='green')
+    ax.fill_between(x[win::sub_samples],
+                    filtering(np.max(res_total_acc1_N50M8, axis = 1), win)[::sub_samples],
+                    filtering(np.max(res_total_acc1_N50M8, axis = 1), win)[::sub_samples], facecolor='green', alpha=0.2)
     
-    ax.plot(x[r], y3, lw=2, label='K=100,M=10', color='black')
-    ax.fill_between(x[r], 
-                    filtering(np.max(res_total_acc1_N100M10, axis = 1), win),
-                    filtering(np.max(res_total_acc1_N100M10, axis = 1), win), facecolor='black', alpha=0.1)
-    #ax.set_title('XXXX')
+    ax.plot(x[win::sub_samples], y3[::sub_samples], lw=2, label='N=100,M=10', color='black')
+    ax.fill_between(x[win::sub_samples], 
+                    filtering(np.max(res_total_acc1_N100M10, axis = 1), win)[::sub_samples],
+                    filtering(np.max(res_total_acc1_N100M10, axis = 1), win)[::sub_samples], facecolor='black', alpha=0.1)
     if judge == 1:
-        ax.plot(x, np.array(1).repeat(T), lw=2, label='Constraints Limits', color='black')
+        ax.plot(x, np.array(1).repeat(T), lw=3, linestyle='dashed', color='black')
         ax.set_ylabel('Maximum Constraint Vaule')
+        ax.legend(fontsize = 20,loc='center right')   
     else:
         ax.set_ylabel('Relative Gap')
-    ax.legend(loc='upper right')
+        ax.legend(fontsize = 20,loc='upper right')   
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+             ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(20)
     ax.set_xlabel('Iterations')
     ax.set_xlim([0,T])
     ax.grid()
@@ -121,5 +126,4 @@ def plot_instances(res_total_acc1_N10M3, res_total_acc1_N20M5,
 plot_instance(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
 plot_instance(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
         
-print('========================= file saved =========================')
-
+print(f'========================= Data saved to file {folder_path} and image saved to file img =========================')
