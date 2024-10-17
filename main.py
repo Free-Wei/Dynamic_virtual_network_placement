@@ -55,7 +55,7 @@ res_total_acc1_N100M10, _, con_test_total_N100M10,_ = simulINS(T,10,100,k,test_t
 
 
 # +++++++++++++++++++ Plot +++++++++++++++++++
-plot_instances(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1.pdf')
-plot_instances(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, f'img/output_T{T}_{test_times}run_N{N}_M{M}_acc1_constraints.pdf', 1)
+plot_instances(res_total_acc1_N10M3, res_total_acc1_N20M5, res_total_acc1_N50M8, res_total_acc1_N100M10, f'img/output_T{T}_{test_times}run_diff_instances_acc1.pdf')
+plot_instances(con_test_total_N10M3, con_test_total_N20M5, con_test_total_N50M8, con_test_total_N100M10, f'img/output_T{T}_{test_times}run_diff_instances_acc1_constraints.pdf', 1)
         
 print(f'========================= Data saved to file {folder_path} and image saved to file img =========================')
