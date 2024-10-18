@@ -2,7 +2,7 @@
 
 This is the code attached to the following paper and variables in the code are the same as notations in the paper:
 
-***Efficient Function Placement in Virtual Networks: An Online Learning Approach***, *Wei HUANG, Richard Combes, Hind Castel, Badii Jouaber*. (XXXXXXXX)
+***Efficient Function Placement in Virtual Networks: An Online Learning Approach***, *Wei HUANG, Richard Combes, Hind Castel, Badii Jouaber*. (https://arxiv.org/abs/2410.13696)
 
 
 # Requirements
